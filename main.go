@@ -16,7 +16,12 @@ StartApp(void) {
 import "C"
 
 import (
+	"fmt"
 	"os"
+
+	log "github.com/sirupsen/logrus"
+
+	"io/ioutil"
 
 	"github.com/urfave/cli"
 )
@@ -25,6 +30,8 @@ import (
 var Version string
 
 func main() {
+	log.SetOutput(ioutil.Discard)
+
 	app := cli.NewApp()
 
 	app.Name = "sudolikeaboss"
@@ -33,6 +40,20 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		go runSudolikeaboss()
 		C.StartApp()
+	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:    "register",
+			Aliases: []string{"a"},
+			Usage:   "registers sudolikeaboss for subsequent uses",
+			Action: func(c *cli.Context) {
+				fmt.Println("Authenticating sudolikeaboss...")
+				fmt.Println("")
+				go runSudolikeabossRegistration()
+				C.StartApp()
+			},
+		},
 	}
 
 	app.Run(os.Args)

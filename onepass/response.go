@@ -22,41 +22,47 @@ func (response *Response) GetPassword() (string, error) {
 	var item Item
 
 	switch response.Payload.Action {
-		case "fillLogin":
-			var loginItem LoginItem
-			if err := json.Unmarshal(itemBytes, &loginItem); err != nil {
-				return "", err
-			}
-			item = loginItem
+	case "fillLogin":
+		var loginItem LoginItem
+		if err := json.Unmarshal(itemBytes, &loginItem); err != nil {
+			return "", err
+		}
+		item = loginItem
 
-		case "fillPassword":
-			var passwordItem PasswordItem
-			if err := json.Unmarshal(itemBytes, &passwordItem); err != nil {
-				return "", err
-			}
-			item = passwordItem
+	case "fillPassword":
+		var passwordItem PasswordItem
+		if err := json.Unmarshal(itemBytes, &passwordItem); err != nil {
+			return "", err
+		}
+		item = passwordItem
 
-		default:
-			errorMsg := fmt.Sprintf("Payload action \"%s\" does not have a password", response.Payload.Action)
-			return "", errors.New(errorMsg)
+	default:
+		errorMsg := fmt.Sprintf("Payload action \"%s\" does not have a password", response.Payload.Action)
+		return "", errors.New(errorMsg)
 	}
 
 	return item.GetPassword()
 }
 
 type ResponsePayload struct {
-	Item          *json.RawMessage       `json:"item"`
-	Options       map[string]interface{} `json:"options"`
-	OpenInTabMode string                 `json:"openInTabMode"`
-	Action  string                       `json:"action"`
+	Item           *json.RawMessage       `json:"item"`
+	Algorithm      string                 `json:"alg"`
+	Method         string                 `json:"method"`
+	Code           string                 `json:"code"`
+	Data           string                 `json:"data"`
+	Hmac           string                 `json:"hmac"`
+	Iv             string                 `json:"iv"`
+	M3             string                 `json:"m3"`
+	CS             string                 `json:"cs"`
+	AssociatedData string                 `json:"adata"`
+	Options        map[string]interface{} `json:"options"`
+	OpenInTabMode  string                 `json:"openInTabMode"`
+	Action         string                 `json:"action"`
 }
-
 
 type Item interface {
 	GetPassword() (string, error)
 }
-
-
 
 type LoginItem struct {
 	Uuid           string                  `json:"uuid"`
@@ -80,11 +86,9 @@ type LoginItemSecureContents struct {
 	Fields   []map[string]string    `json:"fields"`
 }
 
-
-
 type PasswordItem struct {
-	Uuid           string                  `json:"uuid"`
-	Overview       map[string]interface{}  `json:"overview"`
+	Uuid           string                     `json:"uuid"`
+	Overview       map[string]interface{}     `json:"overview"`
 	SecureContents PasswordItemSecureContents `json:"secureContents"`
 }
 
@@ -96,8 +100,6 @@ type PasswordItemSecureContents struct {
 	Password string `json:"password"`
 }
 
-
-
 func LoadResponse(rawResponseStr string) (*Response, error) {
 	rawResponseBytes := []byte(rawResponseStr)
 	var response Response
@@ -108,5 +110,3 @@ func LoadResponse(rawResponseStr string) (*Response, error) {
 
 	return &response, nil
 }
-
-

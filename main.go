@@ -16,15 +16,19 @@ StartApp(void) {
 import "C"
 
 import (
-	"github.com/urfave/cli"
 	"os"
+
+	"github.com/urfave/cli"
 )
+
+// Version is the SHA of the git commit from which this binary was built.
+var Version string
 
 func main() {
 	app := cli.NewApp()
 
 	app.Name = "sudolikeaboss"
-	app.Version = "0.2.1"
+	app.Version = Version
 	app.Usage = "use 1password from the terminal with ease"
 	app.Action = func(c *cli.Context) {
 		go runSudolikeaboss()

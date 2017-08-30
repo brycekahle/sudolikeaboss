@@ -7,6 +7,9 @@ all: build
 build:
 	CC=clang go build -ldflags "-X main.Version=$(VERSION)"
 
+test:
+	go test ./...
+
 package: build
 	-rm -rf _build
 	mkdir -p _build/amd64

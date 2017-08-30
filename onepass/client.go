@@ -2,7 +2,8 @@ package onepass
 
 import (
 	"encoding/json"
-	"github.com/ravenac95/sudolikeaboss/websocketclient"
+
+	"github.com/brycekahle/sudolikeaboss/websocketclient"
 )
 
 type Command struct {

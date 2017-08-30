@@ -3,3 +3,4 @@ sudolikeaboss
 
 # Ignore some build things
 _build
+vendor/

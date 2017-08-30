@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/ravenac95/sudolikeaboss/onepass"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/brycekahle/sudolikeaboss/onepass"
 )
 
 const DEFAULT_TIMEOUT_STRING_SECONDS = "30"

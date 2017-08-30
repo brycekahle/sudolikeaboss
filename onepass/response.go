@@ -107,6 +107,5 @@ func LoadResponse(rawResponseStr string) (*Response, error) {
 	if err := json.Unmarshal(rawResponseBytes, &response); err != nil {
 		return nil, err
 	}
-
 	return &response, nil
 }

@@ -24,14 +24,13 @@ func Exists(testPath string) (bool, error) {
 }
 
 func EnsureDir(ensurePath string) error {
-	err := os.MkdirAll(ensurePath, 0700)
-	return err
+	return os.MkdirAll(ensurePath, 0700)
 }
 
 func HmacSha256(key []byte, dataToSign ...[]byte) []byte {
 	h := hmac.New(sha256.New, key)
 	for _, data := range dataToSign {
-		h.Write(data)
+		_, _ = h.Write(data)
 	}
 	return h.Sum(nil)
 }
@@ -95,7 +94,6 @@ func Encrypt(key []byte, iv []byte, plaintext []byte) ([]byte, error) {
 	}
 
 	paddedPlaintext, err := Pkcs7Pad(plaintext, aes.BlockSize)
-
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +108,6 @@ func Encrypt(key []byte, iv []byte, plaintext []byte) ([]byte, error) {
 
 func Decrypt(key []byte, iv []byte, ciphertext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +121,5 @@ func Decrypt(key []byte, iv []byte, ciphertext []byte) ([]byte, error) {
 	cbc := cipher.NewCBCDecrypter(block, iv)
 	cbc.CryptBlocks(ciphertext, ciphertext)
 
-	unpaddedCiphertext, err := Pkcs7Unpad(ciphertext, aes.BlockSize)
-
-	return unpaddedCiphertext, nil
+	return Pkcs7Unpad(ciphertext, aes.BlockSize)
 }

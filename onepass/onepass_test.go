@@ -58,7 +58,6 @@ const SAMPLE_RESPONSE_0 = `
 
 type MockWebsocketClient struct {
 	responseString string
-	sendHandler    func(v interface{}) error
 }
 
 func (mock *MockWebsocketClient) Connect() error {
@@ -122,6 +121,7 @@ var _ = Describe("Termpass", func() {
 
 		It("should send hello command to 1password", func() {
 			err := client.Connect()
+			Expect(err).To(BeNil())
 
 			mockWebsocketClient.responseString = `{"action":"authBegin"}`
 
@@ -133,6 +133,7 @@ var _ = Describe("Termpass", func() {
 
 		XIt("should send showPopup command to 1password", func() {
 			err := client.Connect()
+			Expect(err).To(BeNil())
 
 			mockWebsocketClient.responseString = SAMPLE_RESPONSE_0
 

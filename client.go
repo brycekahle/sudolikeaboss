@@ -60,24 +60,24 @@ func LoadConfiguration() *onepass.Configuration {
 func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done chan bool) {
 	// Load configuration from a file
 	client, err := onepass.NewClientWithConfig(configuration)
-
 	if err != nil {
 		os.Exit(1)
 	}
 
-	response, err := client.Authenticate(false)
-
+	_, err = client.Authenticate(false)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	response, err = client.SendShowPopupCommand()
-
+	response, err := client.SendShowPopupCommand()
 	if err != nil {
 		os.Exit(1)
 	}
 
 	password, err := response.GetPassword()
+	if err != nil {
+		os.Exit(1)
+	}
 	fmt.Println(password)
 
 	done <- true
@@ -86,13 +86,11 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 func registerWithOnepassword(configuration *onepass.Configuration, done chan bool) {
 	// Load configuration from a file
 	client, err := onepass.NewClientWithConfig(configuration)
-
 	if err != nil {
 		os.Exit(1)
 	}
 
 	_, err = client.Authenticate(true)
-
 	if err != nil {
 		os.Exit(1)
 	}
@@ -115,7 +113,6 @@ func runSudolikeaboss() {
 	}
 
 	timeout, err := strconv.ParseInt(timeoutString, 10, 16)
-
 	if err != nil {
 		os.Exit(1)
 	}
@@ -141,14 +138,7 @@ func runSudolikeabossRegistration() {
 
 	go registerWithOnepassword(configuration, done)
 
-	// Timeout if necessary
-	select {
-	case <-done:
-		// Do nothing no need
-		close(done)
-		os.Exit(1)
-	}
 	// Close the app neatly
+	<-done
 	os.Exit(0)
-
 }

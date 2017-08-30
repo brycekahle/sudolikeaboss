@@ -39,7 +39,6 @@ func NewCustomClient(websocketURI string, websocketProtocol string, websocketOri
 
 func (client *Client) Connect() error {
 	conn, err := client.dial(client.WebsocketURI, client.WebsocketProtocol, client.WebsocketOrigin)
-
 	if err != nil {
 		return err
 	}

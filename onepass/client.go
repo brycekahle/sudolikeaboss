@@ -84,7 +84,6 @@ func NewClientWithConfig(configuration *Configuration) (*OnePasswordClient, erro
 
 func NewClient(websocketURI string, websocketProtocol string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
 	websocketClient := websocketclient.NewClient(websocketURI, websocketProtocol, websocketOrigin)
-
 	return NewCustomClient(websocketClient, defaultHost, stateDirectory)
 }
 
@@ -100,13 +99,11 @@ func NewCustomClient(websocketClient WebsocketClient, defaultHost string, stateD
 
 	// Load the state directory if stuff is in there
 	err := client.LoadOrSetupState()
-
 	if err != nil {
 		return nil, err
 	}
 
 	err = client.Connect()
-
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +114,6 @@ func NewCustomClient(websocketClient WebsocketClient, defaultHost string, stateD
 func (client *OnePasswordClient) LoadOrSetupState() error {
 	stateFilePath := path.Join(client.StateDirectory, "state.json")
 	stateFileExists, err := Exists(stateFilePath)
-
 	if err != nil {
 		return err
 	}
@@ -131,13 +127,11 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 		var stateFileConfig StateFileConfig
 
 		err = json.Unmarshal(stateFileStr, &stateFileConfig)
-
 		if err != nil {
 			return err
 		}
 
 		secret, err := client.base64urlWithoutPadding.DecodeString(stateFileConfig.Secret)
-
 		if err != nil {
 			return err
 		}
@@ -146,7 +140,6 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 		client.secret = secret
 	} else {
 		err := EnsureDir(client.StateDirectory)
-
 		if err != nil {
 			return err
 		}
@@ -156,7 +149,6 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 		client.extID = extID
 
 		secret, err := GenerateRandomBytes(32)
-
 		if err != nil {
 			return err
 		}
@@ -172,15 +164,13 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 			return err
 		}
 
-		return ioutil.WriteFile(stateFilePath, []byte(stateFileStr), 0700)
+		return ioutil.WriteFile(stateFilePath, stateFileStr, 0700)
 	}
 	return nil
 }
 
 func (client *OnePasswordClient) Connect() error {
-	err := client.websocketClient.Connect()
-
-	return err
+	return client.websocketClient.Connect()
 }
 
 func (client *OnePasswordClient) SendShowPopupCommand() (*Response, error) {
@@ -192,20 +182,21 @@ func (client *OnePasswordClient) SendShowPopupCommand() (*Response, error) {
 	command := client.createCommand("showPopup", payload)
 
 	response, err := client.SendEncryptedCommand(command)
-
 	if err != nil {
 		return nil, err
 	}
 
 	decryptedPayloadRaw, err := client.decryptResponse(response)
-
 	if err != nil {
 		return nil, err
 	}
 
 	var decryptedPayload ResponsePayload
 
-	json.Unmarshal(decryptedPayloadRaw, &decryptedPayload)
+	err = json.Unmarshal(decryptedPayloadRaw, &decryptedPayload)
+	if err != nil {
+		return nil, err
+	}
 
 	response.Payload = decryptedPayload
 
@@ -274,7 +265,6 @@ func (client *OnePasswordClient) authRegister() (*Response, error) {
 	authRegisterCommand := client.createCommand("authRegister", authRegisterPayload)
 
 	registerResponse, err := client.SendCommand(authRegisterCommand)
-
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +290,6 @@ func (client *OnePasswordClient) authBegin(cc []byte) (*Response, error) {
 	authBeginCommand := client.createCommand("authBegin", authBeginPayload)
 
 	authBeginResponse, err := client.SendCommand(authBeginCommand)
-
 	if err != nil {
 		return nil, err
 	}
@@ -322,10 +311,10 @@ func (client *OnePasswordClient) generateM3(cs []byte, cc []byte) []byte {
 	csAndCc := append(cs[:], cc[:]...)
 
 	csAndCcSha := sha256.New()
-	csAndCcSha.Write(csAndCc)
+	_, _ = csAndCcSha.Write(csAndCc)
 
 	h := hmac.New(sha256.New, client.secret)
-	h.Write(csAndCcSha.Sum(nil))
+	_, _ = h.Write(csAndCcSha.Sum(nil))
 	return h.Sum(nil)
 }
 
@@ -365,12 +354,12 @@ func (client *OnePasswordClient) Debug(secretB64 string, csB64 string, ccB64 str
 	hmac, _ := client.base64urlWithoutPadding.DecodeString(hmacB64)
 
 	// Generate M3
-	if bytes.Compare(client.generateM3(cs, cc), m3) != 0 {
+	if !bytes.Equal(client.generateM3(cs, cc), m3) {
 		log.Printf("Bad M3 logic")
 	}
 
 	// Generate M4
-	if bytes.Compare(client.generateM4(m3), m4) != 0 {
+	if !bytes.Equal(client.generateM4(m3), m4) {
 		log.Printf("Bad M4 logic")
 	}
 
@@ -388,7 +377,7 @@ func (client *OnePasswordClient) Debug(secretB64 string, csB64 string, ccB64 str
 
 	generatedHmac := client.signMessageHmac([]byte(ivB64), []byte(ciphertextB64), []byte(adata))
 
-	if bytes.Compare(generatedHmac, hmac) != 0 {
+	if !bytes.Equal(generatedHmac, hmac) {
 		log.Printf("Bad Hmac Session Logic")
 		log.Printf("%s != %s", client.base64urlWithoutPadding.EncodeToString(generatedHmac), client.base64urlWithoutPadding.EncodeToString(hmac))
 	}
@@ -411,7 +400,6 @@ func (client *OnePasswordClient) Register(code string) (*Response, error) {
 
 func (client *OnePasswordClient) Authenticate(register bool) (*Response, error) {
 	helloResponse, err := client.SendHelloCommand()
-
 	if err != nil {
 		return nil, err
 	}
@@ -422,33 +410,33 @@ func (client *OnePasswordClient) Authenticate(register bool) (*Response, error) 
 			os.Exit(0)
 		}
 
-		_, err := client.Register(helloResponse.Payload.Code)
-
+		_, err = client.Register(helloResponse.Payload.Code)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	cc, err := GenerateRandomBytes(16)
-
 	if err != nil {
 		return nil, err
 	}
 
 	authBeginResponse, err := client.authBegin(cc)
-
 	if err != nil {
 		return nil, err
 	}
 
 	m3, err := client.base64urlWithoutPadding.DecodeString(authBeginResponse.Payload.M3)
+	if err != nil {
+		return nil, err
+	}
 
 	// Verify M3
 	cs, _ := client.base64urlWithoutPadding.DecodeString(authBeginResponse.Payload.CS)
 
 	expectedM3Bytes := client.generateM3(cs, cc)
 
-	if bytes.Compare(expectedM3Bytes, m3) != 0 {
+	if !bytes.Equal(expectedM3Bytes, m3) {
 		errorMsg := fmt.Sprintf("M3 not expected value")
 		err = errors.New(errorMsg)
 		return nil, err
@@ -466,7 +454,6 @@ func (client *OnePasswordClient) Authenticate(register bool) (*Response, error) 
 	authVerifyCommand := client.createCommand("authVerify", authVerifyPayload)
 
 	authVerifyResponse, err := client.SendCommand(authVerifyCommand)
-
 	if err != nil {
 		return nil, err
 	}
@@ -498,19 +485,16 @@ func (client *OnePasswordClient) Authenticate(register bool) (*Response, error) 
 
 func (client *OnePasswordClient) decryptResponse(response *Response) ([]byte, error) {
 	iv, err := client.base64urlWithoutPadding.DecodeString(response.Payload.Iv)
-
 	if err != nil {
 		return nil, err
 	}
 
 	data, err := client.base64urlWithoutPadding.DecodeString(response.Payload.Data)
-
 	if err != nil {
 		return nil, err
 	}
 
 	hmac, err := client.base64urlWithoutPadding.DecodeString(response.Payload.Hmac)
-
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +508,7 @@ func (client *OnePasswordClient) decryptResponse(response *Response) ([]byte, er
 		client.base64urlWithoutPadding.EncodeToString(expectedHmac),
 	)
 
-	if bytes.Compare(expectedHmac, hmac) != 0 {
+	if !bytes.Equal(expectedHmac, hmac) {
 		errorMsg := fmt.Sprintf("Hmac unexpected")
 		err = errors.New(errorMsg)
 		return nil, err
@@ -538,20 +522,21 @@ func (client *OnePasswordClient) decryptResponse(response *Response) ([]byte, er
 
 func (client *OnePasswordClient) encryptPayload(payload *Payload) (*Payload, error) {
 	iv, err := GenerateRandomBytes(16)
-
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt the payload
 	payloadJSONStr, err := json.Marshal(payload)
-
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt the payload
 	encryptedPayload, err := Encrypt(client.sessionEncK, iv, payloadJSONStr)
+	if err != nil {
+		return nil, err
+	}
 
 	encryptedPayloadB64 := client.base64urlWithoutPadding.EncodeToString(encryptedPayload)
 
@@ -574,19 +559,16 @@ func (client *OnePasswordClient) encryptPayload(payload *Payload) (*Payload, err
 
 func (client *OnePasswordClient) SendCommand(command *Command) (*Response, error) {
 	jsonStr, err := json.Marshal(command)
-
 	if err != nil {
 		return nil, err
 	}
 
 	err = client.SendJSON(jsonStr)
-
 	if err != nil {
 		return nil, err
 	}
 
 	response, err := client.ReceiveJSON()
-
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +581,6 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 	plaintextPayload := command.Payload
 
 	encryptedPayload, err := client.encryptPayload(&plaintextPayload)
-
 	if err != nil {
 		return nil, err
 	}
@@ -607,19 +588,16 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 	command.Payload = *encryptedPayload
 
 	jsonStr, err := json.Marshal(command)
-
 	if err != nil {
 		return nil, err
 	}
 
 	err = client.SendJSON(jsonStr)
-
 	if err != nil {
 		return nil, err
 	}
 
 	response, err := client.ReceiveJSON()
-
 	if err != nil {
 		return nil, err
 	}
@@ -629,20 +607,13 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 
 func (client *OnePasswordClient) SendJSON(jsonStr []byte) error {
 	log.Printf("Sending: %s", jsonStr)
-
-	err := client.websocketClient.Send(jsonStr)
-
-	if err != nil {
-		return err
-	}
-	return nil
+	return client.websocketClient.Send(jsonStr)
 }
 
 func (client *OnePasswordClient) ReceiveJSON() (*Response, error) {
 	var rawResponseStr string
 
 	err := client.websocketClient.Receive(&rawResponseStr)
-
 	if err != nil {
 		return nil, err
 	}
@@ -650,7 +621,6 @@ func (client *OnePasswordClient) ReceiveJSON() (*Response, error) {
 	log.Printf("Received: %s", rawResponseStr)
 
 	response, err := LoadResponse(rawResponseStr)
-
 	if err != nil {
 		return nil, err
 	}

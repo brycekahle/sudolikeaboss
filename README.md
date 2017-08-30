@@ -34,8 +34,7 @@ I tried to make installation as simple as possible. So here's the quickest path 
 *This is by far the easiest method, and the one I recommend most.*
 
 ```
-$ brew tap ravenac95/sudolikeaboss
-$ brew install sudolikeaboss
+$ brew install brycekahle/sudolikeaboss/sudolikeaboss
 ```
 
 ### Install from source
@@ -43,7 +42,7 @@ $ brew install sudolikeaboss
 Assuming that you have Go installed and you know how to use it's associated tools...
 
 ``` 
-$ go get github.com/ravenac95/sudolikeaboss
+$ go get github.com/brycekahle/sudolikeaboss
 ```
 
 The `sudolikeaboss` binary should now be in `$GOPATH/bin/sudolikeaboss`
@@ -52,7 +51,7 @@ The `sudolikeaboss` binary should now be in `$GOPATH/bin/sudolikeaboss`
 
 Download one of the following zips:
 
-- amd64: http://dl.bintray.com/ravenac95/sudolikeaboss/sudolikeaboss_0.2.1_darwin_amd64.zip
+- amd64: https://github.com/brycekahle/sudolikeaboss/releases/download/v0.3.0/sudolikeaboss_v0.3.0_darwin_amd64.zip
 
 *warning*: At this time I'm not sure if the 386 version works. In theory it should, but I don't have access to a 32-bit machine to test this.
 
@@ -63,8 +62,8 @@ This entire workflow, would look like this::
 ```
 $ mkdir sudolikeaboss
 $ cd sudolikeaboss
-$ wget http://dl.bintray.com/ravenac95/sudolikeaboss/sudolikeaboss_0.2.1_darwin_amd64.zip
-$ unzip sudolikeaboss_0.1.0_darwin_amd64.zip
+$ wget https://github.com/brycekahle/sudolikeaboss/releases/download/v0.3.0/sudolikeaboss_v0.3.0_darwin_amd64.zip
+$ unzip sudolikeaboss_v0.3.0_darwin_amd64.zip
 $ cp sudolikeaboss /usr/local/bin/sudolikeaboss
 ```
 

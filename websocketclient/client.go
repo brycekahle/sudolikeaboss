@@ -9,9 +9,9 @@ type Codec interface {
 	Send(*ws.Conn, interface{}) error
 }
 
-// A websocket client meant to be used with the 1password
+// Client is a websocket client meant to be used with the 1password
 type Client struct {
-	WebsocketUri      string
+	WebsocketURI      string
 	WebsocketProtocol string
 	WebsocketOrigin   string
 	conn              *ws.Conn
@@ -19,15 +19,15 @@ type Client struct {
 	codec             Codec
 }
 
-func NewClient(websocketUri string, websocketProtocol string, websocketOrigin string) *Client {
-	return NewCustomClient(websocketUri, websocketProtocol, websocketOrigin, ws.Dial, ws.Message)
+func NewClient(websocketURI string, websocketProtocol string, websocketOrigin string) *Client {
+	return NewCustomClient(websocketURI, websocketProtocol, websocketOrigin, ws.Dial, ws.Message)
 }
 
-func NewCustomClient(websocketUri string, websocketProtocol string, websocketOrigin string,
+func NewCustomClient(websocketURI string, websocketProtocol string, websocketOrigin string,
 	dial func(string, string, string) (*ws.Conn, error), codec Codec) *Client {
 
 	client := Client{
-		WebsocketUri:      websocketUri,
+		WebsocketURI:      websocketURI,
 		WebsocketProtocol: websocketProtocol,
 		WebsocketOrigin:   websocketOrigin,
 		dial:              dial,
@@ -38,7 +38,7 @@ func NewCustomClient(websocketUri string, websocketProtocol string, websocketOri
 }
 
 func (client *Client) Connect() error {
-	conn, err := client.dial(client.WebsocketUri, client.WebsocketProtocol, client.WebsocketOrigin)
+	conn, err := client.dial(client.WebsocketURI, client.WebsocketProtocol, client.WebsocketOrigin)
 
 	if err != nil {
 		return err

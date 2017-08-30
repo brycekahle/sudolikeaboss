@@ -82,8 +82,8 @@ func NewClientWithConfig(configuration *Configuration) (*OnePasswordClient, erro
 	return NewClient(configuration.WebsocketURI, configuration.WebsocketProtocol, configuration.WebsocketOrigin, configuration.DefaultHost, configuration.StateDirectory)
 }
 
-func NewClient(websocketUri string, websocketProtocol string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
-	websocketClient := websocketclient.NewClient(websocketUri, websocketProtocol, websocketOrigin)
+func NewClient(websocketURI string, websocketProtocol string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
+	websocketClient := websocketclient.NewClient(websocketURI, websocketProtocol, websocketOrigin)
 
 	return NewCustomClient(websocketClient, defaultHost, stateDirectory)
 }
@@ -223,7 +223,7 @@ func (client *OnePasswordClient) createCommand(action string, payload Payload) *
 
 	// Increment the number (it's a 1password thing that I saw whilst listening
 	// to their commands
-	client.number += 1
+	client.number++
 	return &command
 }
 
@@ -544,14 +544,14 @@ func (client *OnePasswordClient) encryptPayload(payload *Payload) (*Payload, err
 	}
 
 	// Encrypt the payload
-	payloadJsonStr, err := json.Marshal(payload)
+	payloadJSONStr, err := json.Marshal(payload)
 
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt the payload
-	encryptedPayload, err := Encrypt(client.sessionEncK, iv, payloadJsonStr)
+	encryptedPayload, err := Encrypt(client.sessionEncK, iv, payloadJSONStr)
 
 	encryptedPayloadB64 := client.base64urlWithoutPadding.EncodeToString(encryptedPayload)
 

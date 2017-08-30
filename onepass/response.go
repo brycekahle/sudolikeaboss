@@ -65,29 +65,29 @@ type Item interface {
 }
 
 type LoginItem struct {
-	Uuid           string                  `json:"uuid"`
+	UUID           string                  `json:"uuid"`
 	NakedDomains   []string                `json:"nakedDomains"`
 	Overview       map[string]interface{}  `json:"overview"`
 	SecureContents LoginItemSecureContents `json:"secureContents"`
 }
 
 func (item LoginItem) GetPassword() (string, error) {
-	for _, field_obj := range item.SecureContents.Fields {
-		if field_obj["designation"] == "password" {
-			return field_obj["value"], nil
+	for _, fieldObj := range item.SecureContents.Fields {
+		if fieldObj["designation"] == "password" {
+			return fieldObj["value"], nil
 		}
 	}
 
-	return "", errors.New("No password found in the item.")
+	return "", errors.New("no password found in the item")
 }
 
 type LoginItemSecureContents struct {
-	HtmlForm map[string]interface{} `json:"htmlForm"`
+	HTMLForm map[string]interface{} `json:"htmlForm"`
 	Fields   []map[string]string    `json:"fields"`
 }
 
 type PasswordItem struct {
-	Uuid           string                     `json:"uuid"`
+	UUID           string                     `json:"uuid"`
 	Overview       map[string]interface{}     `json:"overview"`
 	SecureContents PasswordItemSecureContents `json:"secureContents"`
 }

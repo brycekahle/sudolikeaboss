@@ -5,56 +5,41 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/brycekahle/sudolikeaboss/onepass"
+	"github.com/kelseyhightower/envconfig"
 	log "github.com/sirupsen/logrus"
 )
 
-const DEFAULT_TIMEOUT_STRING_SECONDS = "30"
-const DEFAULT_HOST = "sudolikeaboss://local"
-const DEFAULT_WEBSOCKET_URI = "ws://127.0.0.1:6263/4"
-const DEFAULT_WEBSOCKET_PROTOCOL = ""
-const DEFAULT_WEBSOCKET_ORIGIN = "chrome-extension://aomjjhallfgjeglblehebfpbcfeobpgk"
+type Configuration struct {
+	TimeoutSecs    int    `split_words:"true" default:"30"`
+	DefaultHost    string `split_words:"true" default:"sudolikeaboss://local"`
+	StateDirectory string `split_words:"true"`
 
-func LoadConfiguration() *onepass.Configuration {
-	defaultHost := os.Getenv("SUDOLIKEABOSS_DEFAULT_HOST")
-	if defaultHost == "" {
-		defaultHost = DEFAULT_HOST
+	Websocket struct {
+		URI      string `default:"ws://127.0.0.1:6263/4"`
+		Protocol string
+		Origin   string `default:"chrome-extension://aomjjhallfgjeglblehebfpbcfeobpgk"`
+	}
+}
+
+func LoadConfiguration() *Configuration {
+	conf := Configuration{}
+	err := envconfig.Process("SUDOLIKEABOSS", &conf)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	websocketURI := os.Getenv("SUDOLIKEABOSS_WEBSOCKET_URI")
-	if websocketURI == "" {
-		websocketURI = DEFAULT_WEBSOCKET_URI
-	}
-
-	websocketProtocol := os.Getenv("SUDOLIKEABOSS_WEBSOCKET_PROTOCOL")
-	if websocketProtocol == "" {
-		websocketProtocol = DEFAULT_WEBSOCKET_PROTOCOL
-	}
-
-	websocketOrigin := os.Getenv("SUDOLIKEABOSS_WEBSOCKET_ORIGIN")
-	if websocketOrigin == "" {
-		websocketOrigin = DEFAULT_WEBSOCKET_ORIGIN
-	}
-
-	stateDirectory := os.Getenv("SUDOLIKEABOSS_STATE_DIRECTORY")
-	if stateDirectory == "" {
+	if conf.StateDirectory == "" {
 		usr, err := user.Current()
 		if err != nil {
 			log.Fatal(err)
 		}
-		stateDirectory = path.Join(usr.HomeDir, ".sudolikeaboss")
+		conf.StateDirectory = path.Join(usr.HomeDir, ".sudolikeaboss")
 	}
 
-	return &onepass.Configuration{
-		WebsocketURI:      websocketURI,
-		WebsocketProtocol: websocketProtocol,
-		WebsocketOrigin:   websocketOrigin,
-		DefaultHost:       defaultHost,
-		StateDirectory:    stateDirectory,
-	}
+	return &conf
 }
 
 func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done chan bool) {
@@ -105,25 +90,21 @@ func registerWithOnepassword(configuration *onepass.Configuration, done chan boo
 func runSudolikeaboss() {
 	done := make(chan bool)
 
-	configuration := LoadConfiguration()
-
-	timeoutString := os.Getenv("SUDOLIKEABOSS_TIMEOUT_SECS")
-	if timeoutString == "" {
-		timeoutString = DEFAULT_TIMEOUT_STRING_SECONDS
+	conf := LoadConfiguration()
+	oc := onepass.Configuration{
+		WebsocketURI:      conf.Websocket.URI,
+		WebsocketOrigin:   conf.Websocket.Origin,
+		WebsocketProtocol: conf.Websocket.Protocol,
+		StateDirectory:    conf.StateDirectory,
+		DefaultHost:       conf.DefaultHost,
 	}
-
-	timeout, err := strconv.ParseInt(timeoutString, 10, 16)
-	if err != nil {
-		os.Exit(1)
-	}
-
-	go retrievePasswordFromOnepassword(configuration, done)
+	go retrievePasswordFromOnepassword(&oc, done)
 
 	// Timeout if necessary
 	select {
 	case <-done:
 		// Do nothing no need
-	case <-time.After(time.Duration(timeout) * time.Second):
+	case <-time.After(time.Duration(conf.TimeoutSecs) * time.Second):
 		close(done)
 		os.Exit(1)
 	}
@@ -134,9 +115,16 @@ func runSudolikeaboss() {
 func runSudolikeabossRegistration() {
 	done := make(chan bool)
 
-	configuration := LoadConfiguration()
+	conf := LoadConfiguration()
+	oc := onepass.Configuration{
+		WebsocketURI:      conf.Websocket.URI,
+		WebsocketOrigin:   conf.Websocket.Origin,
+		WebsocketProtocol: conf.Websocket.Protocol,
+		StateDirectory:    conf.StateDirectory,
+		DefaultHost:       conf.DefaultHost,
+	}
 
-	go registerWithOnepassword(configuration, done)
+	go registerWithOnepassword(&oc, done)
 
 	// Close the app neatly
 	<-done

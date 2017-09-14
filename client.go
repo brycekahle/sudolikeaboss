@@ -20,7 +20,7 @@ type Configuration struct {
 	Websocket struct {
 		URI      string `default:"ws://127.0.0.1:6263/4"`
 		Protocol string
-		Origin   string `default:"chrome-extension://aomjjhallfgjeglblehebfpbcfeobpgk"`
+		Origin   string `default:"resource://onepassword-at-agilebits-dot-com"`
 	}
 }
 

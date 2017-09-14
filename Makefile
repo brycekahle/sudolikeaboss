@@ -6,6 +6,8 @@ all: build
 
 build:
 	CC=clang go build -ldflags "-X main.Version=$(VERSION)"
+	mkdir -p sudolikeaboss.app/Contents/MacOS
+	cp sudolikeaboss sudolikeaboss.app/Contents/MacOS/sudolikeaboss
 
 test:
 	go test ./...

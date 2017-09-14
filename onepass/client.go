@@ -12,10 +12,9 @@ import (
 	"os"
 	"path"
 
+	"github.com/brycekahle/sudolikeaboss/nativeclient"
 	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/brycekahle/sudolikeaboss/websocketclient"
 )
 
 type Command struct {
@@ -46,8 +45,9 @@ type Payload struct {
 
 type WebsocketClient interface {
 	Connect() error
-	Receive(v interface{}) error
-	Send(v interface{}) error
+	Close()
+	Receive() (string, error)
+	Send(v string) error
 }
 
 // Configuration struct
@@ -83,7 +83,8 @@ func NewClientWithConfig(configuration *Configuration) (*OnePasswordClient, erro
 }
 
 func NewClient(websocketURI string, websocketProtocol string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
-	websocketClient := websocketclient.NewClient(websocketURI, websocketProtocol, websocketOrigin)
+	//websocketClient := websocketclient.NewClient(websocketURI, websocketProtocol, websocketOrigin)
+	websocketClient := nativeclient.NewClient()
 	return NewCustomClient(websocketClient, defaultHost, stateDirectory)
 }
 
@@ -173,6 +174,10 @@ func (client *OnePasswordClient) Connect() error {
 	return client.websocketClient.Connect()
 }
 
+func (client *OnePasswordClient) Close() {
+	client.websocketClient.Close()
+}
+
 func (client *OnePasswordClient) SendShowPopupCommand() (*Response, error) {
 	payload := Payload{
 		URL:     client.DefaultHost,
@@ -207,7 +212,7 @@ func (client *OnePasswordClient) createCommand(action string, payload Payload) *
 	command := Command{
 		Action: action,
 		//Number:   client.number,
-		Version: "4.6.2.90",
+		Version: "4.6.11",
 		//BundleID: "com.sudolikeaboss.sudolikeaboss",
 		Payload: payload,
 	}
@@ -224,7 +229,7 @@ func (client *OnePasswordClient) SendHelloCommand() (*Response, error) {
 	capabilities[1] = "aead-cbchmac-256"
 
 	payload := Payload{
-		Version:      "4.6.2.90",
+		Version:      "4.6.11",
 		ExtID:        client.extID,
 		Capabilities: capabilities,
 	}
@@ -606,21 +611,19 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 }
 
 func (client *OnePasswordClient) SendJSON(jsonStr []byte) error {
-	log.Printf("Sending: %s", jsonStr)
-	return client.websocketClient.Send(jsonStr)
+	log.Debugf("Sending: %s", jsonStr)
+	return client.websocketClient.Send(string(jsonStr))
 }
 
 func (client *OnePasswordClient) ReceiveJSON() (*Response, error) {
-	var rawResponseStr string
-
-	err := client.websocketClient.Receive(&rawResponseStr)
+	rawResponse, err := client.websocketClient.Receive()
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Received: %s", rawResponseStr)
+	log.Printf("Received: %s", string(rawResponse))
 
-	response, err := LoadResponse(rawResponseStr)
+	response, err := LoadResponse(string(rawResponse))
 	if err != nil {
 		return nil, err
 	}

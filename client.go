@@ -46,25 +46,29 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 	// Load configuration from a file
 	client, err := onepass.NewClientWithConfig(configuration)
 	if err != nil {
-		os.Exit(1)
+		log.Fatalf("Error creating onepass client: %v", err)
 	}
 
 	_, err = client.Authenticate(false)
 	if err != nil {
-		os.Exit(1)
+		client.Close()
+		log.Fatalf("Error authenticating: %v", err)
 	}
 
 	response, err := client.SendShowPopupCommand()
 	if err != nil {
-		os.Exit(1)
+		client.Close()
+		log.Fatalf("Error sending showPopup command: %v", err)
 	}
 
 	password, err := response.GetPassword()
 	if err != nil {
-		os.Exit(1)
+		client.Close()
+		log.Fatalf("Error getting password from response: %v", err)
 	}
 	fmt.Println(password)
 
+	client.Close()
 	done <- true
 }
 
@@ -74,6 +78,7 @@ func registerWithOnepassword(configuration *onepass.Configuration, done chan boo
 	if err != nil {
 		os.Exit(1)
 	}
+	defer client.Close()
 
 	_, err = client.Authenticate(true)
 	if err != nil {

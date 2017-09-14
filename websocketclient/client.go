@@ -48,10 +48,16 @@ func (client *Client) Connect() error {
 	return nil
 }
 
-func (client *Client) Receive(v interface{}) error {
-	return client.codec.Receive(client.conn, v)
+func (client *Client) Close() {
+	client.conn.Close()
 }
 
-func (client *Client) Send(v interface{}) error {
+func (client *Client) Receive() (string, error) {
+	var s string
+	err := client.codec.Receive(client.conn, &s)
+	return s, err
+}
+
+func (client *Client) Send(v string) error {
 	return client.codec.Send(client.conn, v)
 }

@@ -21,8 +21,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"io/ioutil"
-
 	"github.com/urfave/cli"
 )
 
@@ -30,7 +28,8 @@ import (
 var Version string
 
 func main() {
-	log.SetOutput(ioutil.Discard)
+	log.SetLevel(log.DebugLevel)
+	log.SetOutput(os.Stderr)
 
 	app := cli.NewApp()
 

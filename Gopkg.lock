@@ -20,6 +20,12 @@
   version = "v1.2.0"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   name = "github.com/satori/go.uuid"
   packages = ["."]
   revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
@@ -70,6 +76,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "52fa661dd6d386d2cd5c2563854f16acd19f091ec4af53f78e85670cbc8dab10"
+  inputs-digest = "3a38e6ed641182b6e6d64a6c22f10f5ad9b216a93099d4cdf38a117eb2247815"
   solver-name = "gps-cdcl"
   solver-version = 1

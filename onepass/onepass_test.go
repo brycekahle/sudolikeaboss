@@ -64,19 +64,14 @@ func (mock *MockWebsocketClient) Connect() error {
 	return nil
 }
 
-func (mock *MockWebsocketClient) Receive(v interface{}) error {
-	switch data := v.(type) {
-	case *string:
-		*data = mock.responseString
-		return nil
-	case *[]byte:
-		*data = []byte(mock.responseString)
-		return nil
-	}
-	return nil
+func (mock *MockWebsocketClient) Close() {
 }
 
-func (mock *MockWebsocketClient) Send(v interface{}) error {
+func (mock *MockWebsocketClient) Receive() (string, error) {
+	return mock.responseString, nil
+}
+
+func (mock *MockWebsocketClient) Send(v string) error {
 	return nil
 }
 

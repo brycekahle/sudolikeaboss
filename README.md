@@ -1,5 +1,12 @@
 # sudolikeaboss - Now you can too!
 
+### IMPORTANT
+1Password 6.8.1 turned on mandatory code signing and [native messaging](https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Native_messaging).
+I am working with AgileBits to *hopefully* get `sudolikeaboss` code signed and the signature added in a future update. Until then, I suggest you
+downgrade to [1Password 6.8](https://cache.agilebits.com/dist/1P/mac4/1Password-6.8.pkg).
+If you installed 1Password from the Mac App Store, then follow [these instructions](https://support.1password.com/switch-from-mac-app-store/) to switch to the downloaded version.
+
+
 **NOTE**: This is a fork from https://github.com/ravenac95/sudolikeaboss.
 
 ![Demo](https://raw.githubusercontent.com/ravenac95/readme-images/master/sudolikeaboss/demo.gif)

@@ -18,9 +18,8 @@ type Configuration struct {
 	StateDirectory string `split_words:"true"`
 
 	Websocket struct {
-		URI      string `default:"ws://127.0.0.1:6263/4"`
-		Protocol string
-		Origin   string `default:"resource://onepassword-at-agilebits-dot-com"`
+		URI    string `default:"ws://127.0.0.1:6263/4"`
+		Origin string `default:"resource://onepassword-at-agilebits-dot-com"`
 	}
 }
 
@@ -92,11 +91,10 @@ func runSudolikeaboss() {
 
 	conf := LoadConfiguration()
 	oc := onepass.Configuration{
-		WebsocketURI:      conf.Websocket.URI,
-		WebsocketOrigin:   conf.Websocket.Origin,
-		WebsocketProtocol: conf.Websocket.Protocol,
-		StateDirectory:    conf.StateDirectory,
-		DefaultHost:       conf.DefaultHost,
+		WebsocketURI:    conf.Websocket.URI,
+		WebsocketOrigin: conf.Websocket.Origin,
+		StateDirectory:  conf.StateDirectory,
+		DefaultHost:     conf.DefaultHost,
 	}
 	go retrievePasswordFromOnepassword(&oc, done)
 
@@ -117,11 +115,10 @@ func runSudolikeabossRegistration() {
 
 	conf := LoadConfiguration()
 	oc := onepass.Configuration{
-		WebsocketURI:      conf.Websocket.URI,
-		WebsocketOrigin:   conf.Websocket.Origin,
-		WebsocketProtocol: conf.Websocket.Protocol,
-		StateDirectory:    conf.StateDirectory,
-		DefaultHost:       conf.DefaultHost,
+		WebsocketURI:    conf.Websocket.URI,
+		WebsocketOrigin: conf.Websocket.Origin,
+		StateDirectory:  conf.StateDirectory,
+		DefaultHost:     conf.DefaultHost,
 	}
 
 	go registerWithOnepassword(&oc, done)

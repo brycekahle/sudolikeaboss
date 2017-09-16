@@ -12,10 +12,9 @@ import (
 	"os"
 	"path"
 
+	"github.com/brycekahle/sudolikeaboss/connection"
 	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/brycekahle/sudolikeaboss/websocketclient"
 )
 
 type Command struct {
@@ -52,16 +51,15 @@ type WebsocketClient interface {
 
 // Configuration struct
 type Configuration struct {
-	WebsocketURI      string `json:"websocketUri"`
-	WebsocketProtocol string `json:"websocketProtocol"`
-	WebsocketOrigin   string `json:"websocketOrigin"`
-	DefaultHost       string `json:"defaultHost"`
-	StateDirectory    string `json:"stateDirectory"`
+	WebsocketURI    string `json:"websocketUri"`
+	WebsocketOrigin string `json:"websocketOrigin"`
+	DefaultHost     string `json:"defaultHost"`
+	StateDirectory  string `json:"stateDirectory"`
 }
 
 type OnePasswordClient struct {
 	DefaultHost             string
-	websocketClient         WebsocketClient
+	opClient                connection.OnePasswordConnection
 	StateDirectory          string
 	number                  int
 	extID                   string
@@ -79,19 +77,22 @@ type StateFileConfig struct {
 }
 
 func NewClientWithConfig(configuration *Configuration) (*OnePasswordClient, error) {
-	return NewClient(configuration.WebsocketURI, configuration.WebsocketProtocol, configuration.WebsocketOrigin, configuration.DefaultHost, configuration.StateDirectory)
+	return NewClient(configuration.WebsocketURI, configuration.WebsocketOrigin, configuration.DefaultHost, configuration.StateDirectory)
 }
 
-func NewClient(websocketURI string, websocketProtocol string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
-	websocketClient := websocketclient.NewClient(websocketURI, websocketProtocol, websocketOrigin)
-	return NewCustomClient(websocketClient, defaultHost, stateDirectory)
+func NewClient(websocketURI string, websocketOrigin string, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
+	opClient, err := connection.NewClient(websocketURI, websocketOrigin)
+	if err != nil {
+		return nil, err
+	}
+	return NewCustomClient(opClient, defaultHost, stateDirectory)
 }
 
-func NewCustomClient(websocketClient WebsocketClient, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
+func NewCustomClient(opc connection.OnePasswordConnection, defaultHost string, stateDirectory string) (*OnePasswordClient, error) {
 	client := OnePasswordClient{
-		websocketClient: websocketClient,
-		DefaultHost:     defaultHost,
-		StateDirectory:  stateDirectory,
+		opClient:       opc,
+		DefaultHost:    defaultHost,
+		StateDirectory: stateDirectory,
 	}
 
 	base64urlWithoutPadding := b64.URLEncoding.WithPadding(b64.NoPadding)
@@ -99,11 +100,6 @@ func NewCustomClient(websocketClient WebsocketClient, defaultHost string, stateD
 
 	// Load the state directory if stuff is in there
 	err := client.LoadOrSetupState()
-	if err != nil {
-		return nil, err
-	}
-
-	err = client.Connect()
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +163,6 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 		return ioutil.WriteFile(stateFilePath, stateFileStr, 0700)
 	}
 	return nil
-}
-
-func (client *OnePasswordClient) Connect() error {
-	return client.websocketClient.Connect()
 }
 
 func (client *OnePasswordClient) SendShowPopupCommand() (*Response, error) {
@@ -558,12 +550,7 @@ func (client *OnePasswordClient) encryptPayload(payload *Payload) (*Payload, err
 }
 
 func (client *OnePasswordClient) SendCommand(command *Command) (*Response, error) {
-	jsonStr, err := json.Marshal(command)
-	if err != nil {
-		return nil, err
-	}
-
-	err = client.SendJSON(jsonStr)
+	err := client.SendJSON(command)
 	if err != nil {
 		return nil, err
 	}
@@ -586,13 +573,7 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 	}
 
 	command.Payload = *encryptedPayload
-
-	jsonStr, err := json.Marshal(command)
-	if err != nil {
-		return nil, err
-	}
-
-	err = client.SendJSON(jsonStr)
+	err = client.SendJSON(command)
 	if err != nil {
 		return nil, err
 	}
@@ -605,25 +586,16 @@ func (client *OnePasswordClient) SendEncryptedCommand(command *Command) (*Respon
 	return response, nil
 }
 
-func (client *OnePasswordClient) SendJSON(jsonStr []byte) error {
-	log.Printf("Sending: %s", jsonStr)
-	return client.websocketClient.Send(jsonStr)
+func (client *OnePasswordClient) SendJSON(v interface{}) error {
+	log.Debugf("sending %v", v)
+	return client.opClient.WriteJSON(v)
 }
 
 func (client *OnePasswordClient) ReceiveJSON() (*Response, error) {
-	var rawResponseStr string
-
-	err := client.websocketClient.Receive(&rawResponseStr)
-	if err != nil {
+	r := Response{}
+	if err := client.opClient.ReadJSON(&r); err != nil {
 		return nil, err
 	}
-
-	log.Printf("Received: %s", rawResponseStr)
-
-	response, err := LoadResponse(rawResponseStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	log.Debugf("receive %v", r)
+	return &r, nil
 }

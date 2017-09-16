@@ -1,6 +1,7 @@
 package onepass_test
 
 import (
+	"encoding/json"
 	"os"
 
 	. "github.com/brycekahle/sudolikeaboss/onepass"
@@ -60,11 +61,7 @@ type MockWebsocketClient struct {
 	responseString string
 }
 
-func (mock *MockWebsocketClient) Connect() error {
-	return nil
-}
-
-func (mock *MockWebsocketClient) Receive(v interface{}) error {
+func (mock MockWebsocketClient) ReadJSON(v interface{}) error {
 	switch data := v.(type) {
 	case *string:
 		*data = mock.responseString
@@ -76,11 +73,15 @@ func (mock *MockWebsocketClient) Receive(v interface{}) error {
 	return nil
 }
 
-func (mock *MockWebsocketClient) Send(v interface{}) error {
+func (mock MockWebsocketClient) WriteJSON(v interface{}) error {
 	return nil
 }
 
-var _ = Describe("Termpass", func() {
+func (mock MockWebsocketClient) Close() error {
+	return nil
+}
+
+var _ = Describe("Sudolikeaboss", func() {
 	Describe("Response", func() {
 		var (
 			response *Response
@@ -88,7 +89,7 @@ var _ = Describe("Termpass", func() {
 		)
 
 		BeforeEach(func() {
-			response, err = LoadResponse(SAMPLE_RESPONSE_0)
+			err = json.Unmarshal([]byte(SAMPLE_RESPONSE_0), response)
 			if err != nil {
 				panic(err)
 			}
@@ -114,15 +115,7 @@ var _ = Describe("Termpass", func() {
 			Expect(err).To(BeNil())
 		})
 
-		It("should connect", func() {
-			err := client.Connect()
-			Expect(err).To(BeNil())
-		})
-
 		It("should send hello command to 1password", func() {
-			err := client.Connect()
-			Expect(err).To(BeNil())
-
 			mockWebsocketClient.responseString = `{"action":"authBegin"}`
 
 			response, err := client.SendHelloCommand()
@@ -132,9 +125,6 @@ var _ = Describe("Termpass", func() {
 		})
 
 		XIt("should send showPopup command to 1password", func() {
-			err := client.Connect()
-			Expect(err).To(BeNil())
-
 			mockWebsocketClient.responseString = SAMPLE_RESPONSE_0
 
 			response, err := client.SendShowPopupCommand()

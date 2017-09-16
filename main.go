@@ -21,8 +21,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"io/ioutil"
-
 	"github.com/urfave/cli"
 )
 

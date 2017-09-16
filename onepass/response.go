@@ -99,13 +99,3 @@ func (item PasswordItem) GetPassword() (string, error) {
 type PasswordItemSecureContents struct {
 	Password string `json:"password"`
 }
-
-func LoadResponse(rawResponseStr string) (*Response, error) {
-	rawResponseBytes := []byte(rawResponseStr)
-	var response Response
-
-	if err := json.Unmarshal(rawResponseBytes, &response); err != nil {
-		return nil, err
-	}
-	return &response, nil
-}

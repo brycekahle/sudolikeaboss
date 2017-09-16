@@ -28,7 +28,8 @@ import (
 var Version string
 
 func main() {
-	log.SetOutput(ioutil.Discard)
+	log.SetLevel(log.ErrorLevel)
+	log.SetOutput(os.Stderr)
 
 	app := cli.NewApp()
 

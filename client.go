@@ -16,6 +16,7 @@ type Configuration struct {
 	TimeoutSecs    int    `split_words:"true" default:"30"`
 	DefaultHost    string `split_words:"true" default:"sudolikeaboss://local"`
 	StateDirectory string `split_words:"true"`
+	LogLevel       string `split_words:"true"`
 
 	Websocket struct {
 		URI    string `default:"ws://127.0.0.1:6263/4"`
@@ -28,6 +29,10 @@ func LoadConfiguration() *Configuration {
 	err := envconfig.Process("SUDOLIKEABOSS", &conf)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if lvl, err := log.ParseLevel(conf.LogLevel); err == nil {
+		log.SetLevel(lvl)
 	}
 
 	if conf.StateDirectory == "" {
@@ -45,22 +50,22 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 	// Load configuration from a file
 	client, err := onepass.NewClientWithConfig(configuration)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	_, err = client.Authenticate(false)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	response, err := client.SendShowPopupCommand()
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	password, err := response.GetPassword()
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	fmt.Println(password)
 
@@ -71,12 +76,12 @@ func registerWithOnepassword(configuration *onepass.Configuration, done chan boo
 	// Load configuration from a file
 	client, err := onepass.NewClientWithConfig(configuration)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	_, err = client.Authenticate(true)
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	fmt.Println("")

@@ -64,8 +64,6 @@ type OnePasswordClient struct {
 	number                  int
 	extID                   string
 	secret                  []byte
-	cc                      []byte
-	cs                      []byte
 	sessionHmacK            []byte
 	sessionEncK             []byte
 	base64urlWithoutPadding *b64.Encoding

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	log "github.com/sirupsen/logrus"
 )
 
 type websocketClient struct {
@@ -23,6 +24,7 @@ func NewWebsocketConnection(url string, origin string) (OnePasswordConnection, e
 }
 
 func (w *websocketClient) SendCommand(c *Command) (*Response, error) {
+	log.Debugf("send: %+v", c)
 	if err := w.conn.WriteJSON(c); err != nil {
 		return nil, err
 	}
@@ -30,6 +32,7 @@ func (w *websocketClient) SendCommand(c *Command) (*Response, error) {
 	if err := w.conn.ReadJSON(&r); err != nil {
 		return nil, err
 	}
+	log.Debugf("recv: %+v", r)
 	return &r, nil
 }
 

@@ -99,6 +99,9 @@ func (n *nativeMessaging) Close() error {
 	if err == nil && len(d) > 0 {
 		log.Debugf("stderr\n%s\n", d)
 	}
-	n.cmd.Process.Signal(os.Interrupt)
+	err = n.cmd.Process.Signal(os.Interrupt)
+	if err != nil {
+		return n.cmd.Process.Kill()
+	}
 	return n.cmd.Wait()
 }

@@ -7,41 +7,9 @@ import (
 )
 
 type Response struct {
-	Action  string          `json:"action"`
+	Action  ResponseAction  `json:"action"`
 	Version string          `json:"version"`
 	Payload ResponsePayload `json:"payload"`
-}
-
-func (response *Response) GetPassword() (string, error) {
-	if response.Action != "fillItem" {
-		errorMsg := fmt.Sprintf("Response action \"%s\" does not have a password", response.Action)
-		return "", errors.New(errorMsg)
-	}
-
-	itemBytes := []byte(*response.Payload.Item)
-	var item Item
-
-	switch response.Payload.Action {
-	case "fillLogin":
-		var loginItem LoginItem
-		if err := json.Unmarshal(itemBytes, &loginItem); err != nil {
-			return "", err
-		}
-		item = loginItem
-
-	case "fillPassword":
-		var passwordItem PasswordItem
-		if err := json.Unmarshal(itemBytes, &passwordItem); err != nil {
-			return "", err
-		}
-		item = passwordItem
-
-	default:
-		errorMsg := fmt.Sprintf("Payload action \"%s\" does not have a password", response.Payload.Action)
-		return "", errors.New(errorMsg)
-	}
-
-	return item.GetPassword()
 }
 
 type ResponsePayload struct {
@@ -57,7 +25,39 @@ type ResponsePayload struct {
 	AssociatedData string                 `json:"adata"`
 	Options        map[string]interface{} `json:"options"`
 	OpenInTabMode  string                 `json:"openInTabMode"`
-	Action         string                 `json:"action"`
+	Action         PayloadAction          `json:"action"`
+}
+
+func (response *Response) GetPassword() (string, error) {
+	if response.Action != FillItem {
+		errorMsg := fmt.Sprintf("Response action \"%s\" does not have a password", response.Action)
+		return "", errors.New(errorMsg)
+	}
+
+	itemBytes := []byte(*response.Payload.Item)
+	var item Item
+
+	switch response.Payload.Action {
+	case FillLogin:
+		var loginItem LoginItem
+		if err := json.Unmarshal(itemBytes, &loginItem); err != nil {
+			return "", err
+		}
+		item = loginItem
+
+	case FillPassword:
+		var passwordItem PasswordItem
+		if err := json.Unmarshal(itemBytes, &passwordItem); err != nil {
+			return "", err
+		}
+		item = passwordItem
+
+	default:
+		errorMsg := fmt.Sprintf("Payload action \"%s\" does not have a password", response.Payload.Action)
+		return "", errors.New(errorMsg)
+	}
+
+	return item.GetPassword()
 }
 
 type Item interface {

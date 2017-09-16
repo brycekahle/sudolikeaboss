@@ -9,36 +9,68 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
-type EncryptedOnePasswordConnection struct {
-	conn   OnePasswordConnection
-	b64    *base64.Encoding
-	block  cipher.Block
-	hmacK  []byte
-	secret []byte
+type EncryptedClient struct {
+	client *OnePasswordClient
+	conn   *EncryptedOnePasswordConnection
 }
 
-func NewEncryptedConnection(conn OnePasswordConnection, encKey []byte, hmacKey []byte, secret []byte) (*EncryptedOnePasswordConnection, error) {
-	block, err := aes.NewCipher(encKey)
+type EncryptedOnePasswordConnection struct {
+	conn  OnePasswordConnection
+	b64   *base64.Encoding
+	block cipher.Block
+	keys  *EncryptionKeys
+}
+
+type EncryptionKeys struct {
+	encryption []byte
+	hmac       []byte
+	secret     []byte
+}
+
+func NewEncryptedClient(client *OnePasswordClient, keys *EncryptionKeys) (*EncryptedClient, error) {
+	econn, err := NewEncryptedConnection(client.conn, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EncryptedClient{
+		conn:   econn,
+		client: client,
+	}, nil
+}
+
+func (c *EncryptedClient) ShowPopup() (*Response, error) {
+	payload := Payload{
+		URL:     c.client.DefaultHost,
+		Options: map[string]string{"source": "toolbar-button"},
+	}
+
+	command := NewCommand(ShowPopup, payload)
+	return c.conn.SendCommand(command)
+}
+
+func NewEncryptedConnection(conn OnePasswordConnection, keys *EncryptionKeys) (*EncryptedOnePasswordConnection, error) {
+	block, err := aes.NewCipher(keys.encryption)
 	if err != nil {
 		return nil, err
 	}
 
 	return &EncryptedOnePasswordConnection{
-		conn:   conn,
-		b64:    base64.RawURLEncoding,
-		block:  block,
-		hmacK:  hmacKey,
-		secret: secret,
+		conn:  conn,
+		b64:   base64.RawURLEncoding,
+		block: block,
+		keys:  keys,
 	}, nil
 }
 
 func (e *EncryptedOnePasswordConnection) SendCommand(command *Command) (*Response, error) {
+	log.WithField("encrypted", true).Debugf("send: %+v", command)
 	encryptedPayload, err := e.encryptPayload(&(command.Payload))
 	if err != nil {
 		return nil, err
@@ -55,6 +87,7 @@ func (e *EncryptedOnePasswordConnection) SendCommand(command *Command) (*Respons
 		return nil, err
 	}
 	r.Payload = *decryptedResponse
+	log.WithField("encrypted", true).Debugf("recv: %+v", r)
 	return r, nil
 }
 
@@ -79,10 +112,10 @@ func (e *EncryptedOnePasswordConnection) encryptPayload(payload *Payload) (*Payl
 	newPayload := Payload{
 		Iv:        e.b64.EncodeToString(iv),
 		Data:      e.b64.EncodeToString(encryptedPayload),
-		Algorithm: "aead-cbchmac-256",
+		Algorithm: algAeadCbcHmac256,
 	}
 
-	newPayload.Hmac = e.b64.EncodeToString(HmacSha256(e.hmacK, []byte(newPayload.Iv), []byte(newPayload.Data)))
+	newPayload.Hmac = e.b64.EncodeToString(HmacSha256(e.keys.hmac, []byte(newPayload.Iv), []byte(newPayload.Data)))
 	return &newPayload, nil
 }
 
@@ -103,14 +136,9 @@ func (e *EncryptedOnePasswordConnection) decryptResponse(p *ResponsePayload) (*R
 	}
 
 	// Verify hmac
-	expectedHmac := HmacSha256(e.hmacK, []byte(p.Iv), []byte(p.Data))
-	log.Debugf(
-		"%s == %s",
-		e.b64.EncodeToString(hmac),
-		e.b64.EncodeToString(expectedHmac),
-	)
+	expectedHmac := HmacSha256(e.keys.hmac, []byte(p.Iv), []byte(p.Data))
 	if !bytes.Equal(expectedHmac, hmac) {
-		return nil, errors.New("invalid HMAC")
+		return nil, fmt.Errorf("invalid HMAC: %s (actual) != %s (expected)", e.b64.EncodeToString(hmac), e.b64.EncodeToString(expectedHmac))
 	}
 
 	payload, err := e.decrypt(iv, data)
@@ -213,7 +241,7 @@ func (e *EncryptedOnePasswordConnection) encrypt(iv []byte, plaintext []byte) ([
 
 func (e *EncryptedOnePasswordConnection) decrypt(iv []byte, ciphertext []byte) ([]byte, error) {
 	if len(ciphertext)%aes.BlockSize != 0 {
-		return nil, errors.New("Ciphertext is not a multiple of the aes blocksize")
+		return nil, errors.New("Ciphertext is not a multiple of the AES blocksize")
 	}
 
 	cbc := cipher.NewCBCDecrypter(e.block, iv)

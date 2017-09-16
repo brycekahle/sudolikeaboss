@@ -16,7 +16,7 @@ type Configuration struct {
 	TimeoutSecs    int    `split_words:"true" default:"30"`
 	DefaultHost    string `split_words:"true" default:"sudolikeaboss://local"`
 	StateDirectory string `split_words:"true"`
-	LogLevel       string `split_words:"true"`
+	LogLevel       string `split_words:"true" default:"error"`
 
 	Websocket struct {
 		URI    string `default:"ws://127.0.0.1:6263/4"`
@@ -53,12 +53,12 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 		log.Fatal(err)
 	}
 
-	_, err = client.Authenticate(false)
+	encClient, err := client.Authenticate(false)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	response, err := client.SendShowPopupCommand()
+	response, err := encClient.ShowPopup()
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -61,20 +61,10 @@ type MockWebsocketClient struct {
 	responseString string
 }
 
-func (mock MockWebsocketClient) ReadJSON(v interface{}) error {
-	switch data := v.(type) {
-	case *string:
-		*data = mock.responseString
-		return nil
-	case *[]byte:
-		*data = []byte(mock.responseString)
-		return nil
-	}
-	return nil
-}
-
-func (mock MockWebsocketClient) WriteJSON(v interface{}) error {
-	return nil
+func (mock MockWebsocketClient) SendCommand(cmd *Command) (*Response, error) {
+	r := Response{}
+	err := json.Unmarshal([]byte(mock.responseString), &r)
+	return &r, err
 }
 
 func (mock MockWebsocketClient) Close() error {

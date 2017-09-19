@@ -4,30 +4,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func (client *OnePasswordClient) Authenticate(register bool) (*EncryptedClient, error) {
-	helloResponse, err := client.SendHelloCommand()
-	if err != nil {
-		return nil, err
-	}
-
-	if register {
-		if helloResponse.Action != ResponseAuthNew {
-			fmt.Println("sudolikeaboss is already registered.")
-			os.Exit(0)
-		}
-
-		_, err = client.Register(helloResponse.Payload.Code)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	cc, err := GenerateRandomBytes(16)
+func (client *OnePasswordClient) Authenticate() (*EncryptedClient, error) {
+	cc, err := generateRandomBytes(16)
 	if err != nil {
 		return nil, err
 	}
@@ -53,17 +35,17 @@ func (client *OnePasswordClient) Authenticate(register bool) (*EncryptedClient, 
 		return nil, fmt.Errorf("invalid M3: %s (actual) != %s (expected)", authBeginResponse.Payload.M3, base64.RawURLEncoding.EncodeToString(expectedM3Bytes))
 	}
 
-	m4 := HmacSha256(client.secret, m3)
-	authVerifyResponse, err := client.authVerify(m4)
+	m4 := hmacSha256(client.secret, m3)
+	er, err := client.authVerify(m4)
 	if err != nil {
 		return nil, err
 	}
 
 	keys := EncryptionKeys{
 		// enc = HMAC-SHA256(secret, M3|M4|"encryption")
-		encryption: HmacSha256(client.secret, m3, m4, []byte("encryption")),
+		encryption: hmacSha256(client.secret, m3, m4, []byte("encryption")),
 		// hmac = HMAC-SHA256(secret, M4|M3|"hmac")
-		hmac:   HmacSha256(client.secret, m4, m3, []byte("hmac")),
+		hmac:   hmacSha256(client.secret, m4, m3, []byte("hmac")),
 		secret: client.secret,
 	}
 
@@ -72,16 +54,16 @@ func (client *OnePasswordClient) Authenticate(register bool) (*EncryptedClient, 
 		return nil, err
 	}
 
-	rp, err := encClient.conn.decryptResponse(&authVerifyResponse.Payload)
+	authVerifyResponse := WelcomeResponse{}
+	err = encClient.conn.Decrypt(er, &authVerifyResponse)
 	if err != nil {
 		return nil, err
 	}
-	authVerifyResponse.Payload = *rp
 	log.WithField("encrypted", true).Debugf("recv: %+v", authVerifyResponse)
 	return encClient, nil
 }
 
-func (client *OnePasswordClient) authRegister() (*Response, error) {
+func (client *OnePasswordClient) authRegister() error {
 	authRegisterPayload := Payload{
 		ExtID:  client.extID,
 		Method: methodSmaHmac256,
@@ -89,18 +71,31 @@ func (client *OnePasswordClient) authRegister() (*Response, error) {
 	}
 
 	authRegisterCommand := NewCommand(SendAuthRegister, authRegisterPayload)
-	registerResponse, err := client.conn.SendCommand(authRegisterCommand)
+	err := client.conn.SendCommand(authRegisterCommand)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	registerResponse := EmbeddedResponse{}
+	err = client.conn.ReadResponse(&registerResponse)
+	if err != nil {
+		return err
 	}
 
 	if registerResponse.Action != ResponseAuthRegistered {
-		return nil, fmt.Errorf("Unexpected response: %s", registerResponse.Action)
+		return fmt.Errorf("Unexpected response: %s", registerResponse.Action)
 	}
-	return registerResponse, nil
+	return nil
 }
 
-func (client *OnePasswordClient) authBegin(cc []byte) (*Response, error) {
+type AuthContinueResponse struct {
+	EmbeddedResponse
+	Payload struct {
+		M3 string `json:"m3"`
+		CS string `json:"cs"`
+	} `json:"payload"`
+}
+
+func (client *OnePasswordClient) authBegin(cc []byte) (*AuthContinueResponse, error) {
 	authBeginPayload := Payload{
 		ExtID:  client.extID,
 		Method: methodSmaHmac256,
@@ -108,7 +103,12 @@ func (client *OnePasswordClient) authBegin(cc []byte) (*Response, error) {
 	}
 
 	authBeginCommand := NewCommand(SendAuthBegin, authBeginPayload)
-	authBeginResponse, err := client.conn.SendCommand(authBeginCommand)
+	err := client.conn.SendCommand(authBeginCommand)
+	if err != nil {
+		return nil, err
+	}
+	authBeginResponse := AuthContinueResponse{}
+	err = client.conn.ReadResponse(&authBeginResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -117,10 +117,17 @@ func (client *OnePasswordClient) authBegin(cc []byte) (*Response, error) {
 		return nil, fmt.Errorf("Unexpected response: %s", authBeginResponse.Action)
 	}
 
-	return authBeginResponse, nil
+	return &authBeginResponse, nil
 }
 
-func (client *OnePasswordClient) authVerify(m4 []byte) (*Response, error) {
+type WelcomeResponse struct {
+	EmbeddedResponse
+	Payload struct {
+		Capabilities []string `json:"capabilities"`
+	} `json:"payload"`
+}
+
+func (client *OnePasswordClient) authVerify(m4 []byte) (*EncryptedResponse, error) {
 	authVerifyPayload := Payload{
 		ExtID:  client.extID,
 		Method: methodSmaHmac256,
@@ -128,7 +135,12 @@ func (client *OnePasswordClient) authVerify(m4 []byte) (*Response, error) {
 	}
 
 	authVerifyCommand := NewCommand(SendAuthVerify, authVerifyPayload)
-	authVerifyResponse, err := client.conn.SendCommand(authVerifyCommand)
+	err := client.conn.SendCommand(authVerifyCommand)
+	if err != nil {
+		return nil, err
+	}
+	authVerifyResponse := EncryptedResponse{}
+	err = client.conn.ReadResponse(&authVerifyResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -136,5 +148,5 @@ func (client *OnePasswordClient) authVerify(m4 []byte) (*Response, error) {
 	if authVerifyResponse.Action != ResponseWelcome {
 		return nil, fmt.Errorf("Unexpected response: %s", authVerifyResponse.Action)
 	}
-	return authVerifyResponse, nil
+	return &authVerifyResponse, nil
 }

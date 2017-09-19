@@ -12,11 +12,15 @@ StartApp(void) {
 	[NSApp run];
 	return 0;
 }
+int
+ExitApp(void) {
+	[NSApp terminate:nil];
+	return 0;
+}
 */
 import "C"
 
 import (
-	"fmt"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -29,6 +33,9 @@ var Version string
 
 func main() {
 	log.SetLevel(log.ErrorLevel)
+	log.SetFormatter(&log.TextFormatter{
+		DisableTimestamp: true,
+	})
 	log.SetOutput(os.Stderr)
 
 	app := cli.NewApp()
@@ -37,22 +44,11 @@ func main() {
 	app.Version = Version
 	app.Usage = "use 1password from the terminal with ease"
 	app.Action = func(c *cli.Context) {
-		go runSudolikeaboss()
+		go func() {
+			run()
+			C.ExitApp()
+		}()
 		C.StartApp()
-	}
-
-	app.Commands = []cli.Command{
-		{
-			Name:    "register",
-			Aliases: []string{"a"},
-			Usage:   "registers sudolikeaboss for subsequent uses",
-			Action: func(c *cli.Context) {
-				fmt.Println("Authenticating sudolikeaboss...")
-				fmt.Println("")
-				go runSudolikeabossRegistration()
-				C.StartApp()
-			},
-		},
 	}
 
 	_ = app.Run(os.Args)

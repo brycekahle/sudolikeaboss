@@ -17,7 +17,7 @@ import (
 
 type EncryptedClient struct {
 	client *OnePasswordClient
-	conn   *EncryptedOnePasswordConnection
+	conn   EncryptedConnection
 }
 
 type EncryptedOnePasswordConnection struct {
@@ -45,17 +45,39 @@ func NewEncryptedClient(client *OnePasswordClient, keys *EncryptionKeys) (*Encry
 	}, nil
 }
 
-func (c *EncryptedClient) ShowPopup() (*Response, error) {
+type FillItemResponse struct {
+	EmbeddedResponse
+	Payload struct {
+		Action  PayloadAction    `json:"action"`
+		Options map[string]bool  `json:"options"`
+		Item    *json.RawMessage `json:"item"`
+	} `json:"payload"`
+}
+
+func (c *EncryptedClient) ShowPopup() (*FillItemResponse, error) {
 	payload := Payload{
 		URL:     c.client.DefaultHost,
 		Options: map[string]string{"source": "toolbar-button"},
 	}
 
 	command := NewCommand(ShowPopup, payload)
-	return c.conn.SendCommand(command)
+	err := c.conn.SendCommand(command)
+	if err != nil {
+		return nil, err
+	}
+	response := FillItemResponse{}
+	err = c.conn.ReadResponse(&response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, err
 }
 
-func NewEncryptedConnection(conn OnePasswordConnection, keys *EncryptionKeys) (*EncryptedOnePasswordConnection, error) {
+func (c *EncryptedClient) Close() error {
+	return c.conn.Close()
+}
+
+func NewEncryptedConnection(conn OnePasswordConnection, keys *EncryptionKeys) (EncryptedConnection, error) {
 	block, err := aes.NewCipher(keys.encryption)
 	if err != nil {
 		return nil, err
@@ -69,30 +91,39 @@ func NewEncryptedConnection(conn OnePasswordConnection, keys *EncryptionKeys) (*
 	}, nil
 }
 
-func (e *EncryptedOnePasswordConnection) SendCommand(command *Command) (*Response, error) {
+func (e *EncryptedOnePasswordConnection) SendCommand(command *Command) error {
 	log.WithField("encrypted", true).Debugf("send: %+v", command)
 	encryptedPayload, err := e.encryptPayload(&(command.Payload))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	command.Payload = *encryptedPayload
-	r, err := e.conn.SendCommand(command)
+	return e.conn.SendCommand(command)
+}
+
+func (e *EncryptedOnePasswordConnection) ReadResponse(r interface{}) error {
+	er := EncryptedResponse{}
+	err := e.conn.ReadResponse(&er)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	decryptedResponse, err := e.decryptResponse(&(r.Payload))
+	err = e.Decrypt(&er, r)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	r.Payload = *decryptedResponse
+
 	log.WithField("encrypted", true).Debugf("recv: %+v", r)
-	return r, nil
+	return nil
+}
+
+func (e *EncryptedOnePasswordConnection) Close() error {
+	return e.conn.Close()
 }
 
 func (e *EncryptedOnePasswordConnection) encryptPayload(payload *Payload) (*Payload, error) {
-	iv, err := GenerateRandomBytes(16)
+	iv, err := generateRandomBytes(16)
 	if err != nil {
 		return nil, err
 	}
@@ -115,43 +146,55 @@ func (e *EncryptedOnePasswordConnection) encryptPayload(payload *Payload) (*Payl
 		Algorithm: algAeadCbcHmac256,
 	}
 
-	newPayload.Hmac = e.b64.EncodeToString(HmacSha256(e.keys.hmac, []byte(newPayload.Iv), []byte(newPayload.Data)))
+	newPayload.Hmac = e.b64.EncodeToString(hmacSha256(e.keys.hmac, []byte(newPayload.Iv), []byte(newPayload.Data)))
 	return &newPayload, nil
 }
 
-func (e *EncryptedOnePasswordConnection) decryptResponse(p *ResponsePayload) (*ResponsePayload, error) {
-	iv, err := e.b64.DecodeString(p.Iv)
+func (e *EncryptedOnePasswordConnection) Decrypt(er *EncryptedResponse, r interface{}) error {
+	iv, err := e.b64.DecodeString(er.Payload.Iv)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	data, err := e.b64.DecodeString(p.Data)
+	data, err := e.b64.DecodeString(er.Payload.Data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	hmac, err := e.b64.DecodeString(p.Hmac)
+	hmac, err := e.b64.DecodeString(er.Payload.Hmac)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Verify hmac
-	expectedHmac := HmacSha256(e.keys.hmac, []byte(p.Iv), []byte(p.Data))
+	expectedHmac := hmacSha256(e.keys.hmac, []byte(er.Payload.Iv), []byte(er.Payload.Data))
 	if !bytes.Equal(expectedHmac, hmac) {
-		return nil, fmt.Errorf("invalid HMAC: %s (actual) != %s (expected)", e.b64.EncodeToString(hmac), e.b64.EncodeToString(expectedHmac))
+		return fmt.Errorf("invalid HMAC: %s (actual) != %s (expected)", e.b64.EncodeToString(hmac), e.b64.EncodeToString(expectedHmac))
 	}
 
 	payload, err := e.decrypt(iv, data)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	log.WithField("raw_payload", true).Debugf("recv: %s", payload)
 
-	rp := ResponsePayload{}
-	err = json.Unmarshal(payload, &rp)
-	if err != nil {
-		return nil, err
+	ip := json.RawMessage(payload)
+	ir := IntermediateResponse{
+		EmbeddedResponse: EmbeddedResponse{
+			Action:  er.Action,
+			Version: er.Version,
+		},
+		Payload: &ip,
 	}
-	return &rp, nil
+	ibuf, err := json.Marshal(ir)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(ibuf, r)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func generateM3(secret []byte, cs []byte, cc []byte) []byte {
@@ -165,7 +208,7 @@ func generateM3(secret []byte, cs []byte, cc []byte) []byte {
 	return h.Sum(nil)
 }
 
-func HmacSha256(key []byte, dataToSign ...[]byte) []byte {
+func hmacSha256(key []byte, dataToSign ...[]byte) []byte {
 	h := hmac.New(sha256.New, key)
 	for _, data := range dataToSign {
 		_, _ = h.Write(data)
@@ -173,11 +216,11 @@ func HmacSha256(key []byte, dataToSign ...[]byte) []byte {
 	return h.Sum(nil)
 }
 
-// GenerateRandomBytes returns securely generated random bytes.
+// generateRandomBytes returns securely generated random bytes.
 // It will return an error if the system's secure random
 // number generator fails to function correctly, in which
 // case the caller should not continue.
-func GenerateRandomBytes(n int) ([]byte, error) {
+func generateRandomBytes(n int) ([]byte, error) {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.
@@ -188,8 +231,8 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-// Pkcs7Pad Appends padding.
-func Pkcs7Pad(data []byte, blocklen int) ([]byte, error) {
+// pkcs7Pad Appends padding.
+func pkcs7Pad(data []byte, blocklen int) ([]byte, error) {
 	if blocklen <= 0 {
 		return nil, fmt.Errorf("invalid blocklen %d", blocklen)
 	}
@@ -202,8 +245,8 @@ func Pkcs7Pad(data []byte, blocklen int) ([]byte, error) {
 	return append(data, pad...), nil
 }
 
-// Pkcs7Unpad Returns slice of the original data without padding.
-func Pkcs7Unpad(data []byte, blocklen int) ([]byte, error) {
+// pkcs7Unpad Returns slice of the original data without padding.
+func pkcs7Unpad(data []byte, blocklen int) ([]byte, error) {
 	if blocklen <= 0 {
 		return nil, fmt.Errorf("invalid blocklen %d", blocklen)
 	}
@@ -226,7 +269,7 @@ func Pkcs7Unpad(data []byte, blocklen int) ([]byte, error) {
 }
 
 func (e *EncryptedOnePasswordConnection) encrypt(iv []byte, plaintext []byte) ([]byte, error) {
-	paddedPlaintext, err := Pkcs7Pad(plaintext, aes.BlockSize)
+	paddedPlaintext, err := pkcs7Pad(plaintext, aes.BlockSize)
 	if err != nil {
 		return nil, err
 	}
@@ -247,5 +290,5 @@ func (e *EncryptedOnePasswordConnection) decrypt(iv []byte, ciphertext []byte) (
 	cbc := cipher.NewCBCDecrypter(e.block, iv)
 	cbc.CryptBlocks(ciphertext, ciphertext)
 
-	return Pkcs7Unpad(ciphertext, aes.BlockSize)
+	return pkcs7Unpad(ciphertext, aes.BlockSize)
 }

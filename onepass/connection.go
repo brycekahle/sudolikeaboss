@@ -1,8 +1,14 @@
 package onepass
 
 type OnePasswordConnection interface {
-	SendCommand(c *Command) (*Response, error)
+	SendCommand(c *Command) error
+	ReadResponse(r interface{}) error
 	Close() error
+}
+
+type EncryptedConnection interface {
+	OnePasswordConnection
+	Decrypt(*EncryptedResponse, interface{}) error
 }
 
 func NewConnection(configuration *Configuration) (OnePasswordConnection, error) {

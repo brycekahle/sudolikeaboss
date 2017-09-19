@@ -77,15 +77,12 @@ func NewNativeMessagingConnection() (OnePasswordConnection, error) {
 	return &nc, nil
 }
 
-func (n *nativeMessaging) SendCommand(c *Command) (*Response, error) {
-	if err := json.NewEncoder(n.stdin).Encode(c); err != nil {
-		return nil, err
-	}
-	r := Response{}
-	if err := json.NewDecoder(n.stdout).Decode(&r); err != nil {
-		return nil, err
-	}
-	return &r, nil
+func (n *nativeMessaging) SendCommand(c *Command) error {
+	return json.NewEncoder(n.stdin).Encode(c)
+}
+
+func (n *nativeMessaging) ReadResponse(r interface{}) error {
+	return json.NewDecoder(n.stdout).Decode(r)
 }
 
 func (n *nativeMessaging) Close() error {

@@ -52,11 +52,27 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer client.Close()
 
-	encClient, err := client.Authenticate(false)
+	helloResponse, err := client.Hello()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if helloResponse.Action == onepass.ResponseAuthNew {
+		fmt.Fprintf(os.Stderr, "The 1password helper will request registration of code: %s\n", helloResponse.Payload.Code)
+		fmt.Fprintf(os.Stderr, "To complete registration. You must accept that code from the helper.\n")
+		err = client.Register()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	encClient, err := client.Authenticate()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer encClient.Close()
 
 	response, err := encClient.ShowPopup()
 	if err != nil {
@@ -72,26 +88,8 @@ func retrievePasswordFromOnepassword(configuration *onepass.Configuration, done 
 	done <- true
 }
 
-func registerWithOnepassword(configuration *onepass.Configuration, done chan bool) {
-	// Load configuration from a file
-	client, err := onepass.NewClientWithConfig(configuration)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = client.Authenticate(true)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("")
-	fmt.Println("Congrats sudolikeaboss is registered!")
-
-	done <- true
-}
-
 // Run the main sudolikeaboss entry point
-func runSudolikeaboss() {
+func run() {
 	done := make(chan bool)
 
 	conf := LoadConfiguration()
@@ -104,31 +102,12 @@ func runSudolikeaboss() {
 	go retrievePasswordFromOnepassword(&oc, done)
 
 	// Timeout if necessary
+	dur := time.Duration(conf.TimeoutSecs) * time.Second
 	select {
 	case <-done:
 		// Do nothing no need
-	case <-time.After(time.Duration(conf.TimeoutSecs) * time.Second):
+	case <-time.After(dur):
 		close(done)
-		os.Exit(1)
+		log.Fatalf("Timed out after %s", dur.String())
 	}
-	// Close the app neatly
-	os.Exit(0)
-}
-
-func runSudolikeabossRegistration() {
-	done := make(chan bool)
-
-	conf := LoadConfiguration()
-	oc := onepass.Configuration{
-		WebsocketURI:    conf.Websocket.URI,
-		WebsocketOrigin: conf.Websocket.Origin,
-		StateDirectory:  conf.StateDirectory,
-		DefaultHost:     conf.DefaultHost,
-	}
-
-	go registerWithOnepassword(&oc, done)
-
-	// Close the app neatly
-	<-done
-	os.Exit(0)
 }

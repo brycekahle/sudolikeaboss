@@ -2,38 +2,32 @@ package onepass
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 )
 
-type Response struct {
-	Action  ResponseAction  `json:"action"`
-	Version string          `json:"version"`
-	Payload ResponsePayload `json:"payload"`
+type EmbeddedResponse struct {
+	Action  ResponseAction `json:"action"`
+	Version string         `json:"version"`
 }
 
-type ResponsePayload struct {
-	Item           *json.RawMessage       `json:"item"`
-	Algorithm      string                 `json:"alg"`
-	Method         string                 `json:"method"`
-	Code           string                 `json:"code"`
-	Data           string                 `json:"data"`
-	Hmac           string                 `json:"hmac"`
-	Iv             string                 `json:"iv"`
-	M3             string                 `json:"m3"`
-	CS             string                 `json:"cs"`
-	AssociatedData string                 `json:"adata"`
-	Options        map[string]interface{} `json:"options"`
-	OpenInTabMode  string                 `json:"openInTabMode"`
-	Action         PayloadAction          `json:"action"`
+type EncryptedResponse struct {
+	EmbeddedResponse
+	Payload struct {
+		Algorithm string `json:"alg"`
+		Iv        string `json:"iv"`
+		Hmac      string `json:"hmac"`
+		Data      string `json:"data"`
+	} `json:"payload"`
 }
 
-func (response *Response) GetPassword() (string, error) {
-	if response.Action != FillItem {
-		errorMsg := fmt.Sprintf("Response action \"%s\" does not have a password", response.Action)
-		return "", errors.New(errorMsg)
-	}
+type IntermediateResponse struct {
+	EmbeddedResponse
+	Payload *json.RawMessage `json:"payload"`
+}
 
+func (response *FillItemResponse) GetPassword() (string, error) {
 	itemBytes := []byte(*response.Payload.Item)
 	var item Item
 
@@ -41,20 +35,19 @@ func (response *Response) GetPassword() (string, error) {
 	case FillLogin:
 		var loginItem LoginItem
 		if err := json.Unmarshal(itemBytes, &loginItem); err != nil {
-			return "", err
+			return "", errors.Wrap(err, "error unmarshaling LoginItem")
 		}
 		item = loginItem
 
 	case FillPassword:
 		var passwordItem PasswordItem
 		if err := json.Unmarshal(itemBytes, &passwordItem); err != nil {
-			return "", err
+			return "", errors.Wrap(err, "error unmarshaling PasswordItem")
 		}
 		item = passwordItem
 
 	default:
-		errorMsg := fmt.Sprintf("Payload action \"%s\" does not have a password", response.Payload.Action)
-		return "", errors.New(errorMsg)
+		return "", fmt.Errorf("Payload action \"%s\" does not have a password", response.Payload.Action)
 	}
 
 	return item.GetPassword()
@@ -64,38 +57,41 @@ type Item interface {
 	GetPassword() (string, error)
 }
 
+type LoginField struct {
+	Value       string `json:"value"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Designation string `json:"designation"`
+}
+
 type LoginItem struct {
-	UUID           string                  `json:"uuid"`
-	NakedDomains   []string                `json:"nakedDomains"`
-	Overview       map[string]interface{}  `json:"overview"`
-	SecureContents LoginItemSecureContents `json:"secureContents"`
+	UUID           string            `json:"uuid"`
+	NakedDomains   []string          `json:"nakedDomains"`
+	Overview       map[string]string `json:"overview"`
+	SecureContents struct {
+		HTMLForm map[string]interface{} `json:"htmlForm"`
+		Fields   []LoginField           `json:"fields"`
+	} `json:"secureContents"`
 }
 
 func (item LoginItem) GetPassword() (string, error) {
 	for _, fieldObj := range item.SecureContents.Fields {
-		if fieldObj["designation"] == "password" {
-			return fieldObj["value"], nil
+		if fieldObj.Designation == "password" {
+			return fieldObj.Value, nil
 		}
 	}
 
 	return "", errors.New("no password found in the item")
 }
 
-type LoginItemSecureContents struct {
-	HTMLForm map[string]interface{} `json:"htmlForm"`
-	Fields   []map[string]string    `json:"fields"`
-}
-
 type PasswordItem struct {
-	UUID           string                     `json:"uuid"`
-	Overview       map[string]interface{}     `json:"overview"`
-	SecureContents PasswordItemSecureContents `json:"secureContents"`
+	UUID           string                 `json:"uuid"`
+	Overview       map[string]interface{} `json:"overview"`
+	SecureContents struct {
+		Password string `json:"password"`
+	} `json:"secureContents"`
 }
 
 func (item PasswordItem) GetPassword() (string, error) {
 	return item.SecureContents.Password, nil
-}
-
-type PasswordItemSecureContents struct {
-	Password string `json:"password"`
 }

@@ -8,8 +8,8 @@ import (
 	"os"
 	"path"
 
-	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 const methodSmaHmac256 = "auth-sma-hmac256"
@@ -27,7 +27,6 @@ type OnePasswordClient struct {
 	DefaultHost    string
 	conn           OnePasswordConnection
 	StateDirectory string
-	number         int
 	extID          string
 	secret         []byte
 }
@@ -72,7 +71,7 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 			return err
 		}
 
-		secret, err = GenerateRandomBytes(32)
+		secret, err = generateRandomBytes(32)
 		if err != nil {
 			return err
 		}
@@ -107,10 +106,27 @@ func (client *OnePasswordClient) LoadOrSetupState() error {
 
 	client.extID = stateFileConfig.ExtID
 	client.secret = secret
+	log.WithFields(log.Fields{
+		"extID":  stateFileConfig.ExtID,
+		"secret": base64.RawURLEncoding.EncodeToString(secret),
+	}).Debug("state loaded")
 	return nil
 }
 
-func (client *OnePasswordClient) SendHelloCommand() (*Response, error) {
+func (client *OnePasswordClient) Close() error {
+	return client.conn.Close()
+}
+
+type AuthNewOrBeginResponse struct {
+	EmbeddedResponse
+	Payload struct {
+		Algorithm string `json:"alg"`
+		Method    string `json:"method"`
+		Code      string `json:"code"`
+	} `json:"payload"`
+}
+
+func (client *OnePasswordClient) Hello() (*AuthNewOrBeginResponse, error) {
 	payload := Payload{
 		Version:      clientVersion,
 		ExtID:        client.extID,
@@ -118,7 +134,12 @@ func (client *OnePasswordClient) SendHelloCommand() (*Response, error) {
 	}
 
 	command := NewCommand(SendHello, payload)
-	response, err := client.conn.SendCommand(command)
+	err := client.conn.SendCommand(command)
+	if err != nil {
+		return nil, err
+	}
+	response := AuthNewOrBeginResponse{}
+	err = client.conn.ReadResponse(&response)
 	if err != nil {
 		return nil, err
 	}
@@ -126,17 +147,5 @@ func (client *OnePasswordClient) SendHelloCommand() (*Response, error) {
 	if response.Action != ResponseAuthNew && response.Action != ResponseAuthBegin {
 		return nil, fmt.Errorf("Unexpected response: %s", response.Action)
 	}
-	return response, nil
-}
-
-func (client *OnePasswordClient) Register(code string) (*Response, error) {
-	fmt.Printf("The 1password helper will request registration of code: %s\n", code)
-	fmt.Println("To complete registration. You must accept that code from the helper.")
-	_, err := client.authRegister()
-
-	if err != nil {
-		return nil, errors.Wrap(err, "registration failed")
-	}
-
-	return nil, nil
+	return &response, nil
 }

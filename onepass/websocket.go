@@ -1,6 +1,7 @@
 package onepass
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -20,20 +21,32 @@ func NewWebsocketConnection(url string, origin string) (OnePasswordConnection, e
 		HandshakeTimeout: 5 * time.Second,
 	}
 	conn, _, err := dialer.Dial(url, headers)
-	return &websocketClient{conn}, err
+	if err != nil {
+		return nil, err
+	}
+	return &websocketClient{conn}, nil
 }
 
-func (w *websocketClient) SendCommand(c *Command) (*Response, error) {
+func (w *websocketClient) SendCommand(c *Command) error {
 	log.Debugf("send: %+v", c)
-	if err := w.conn.WriteJSON(c); err != nil {
-		return nil, err
+	return w.conn.WriteJSON(c)
+}
+
+func (w *websocketClient) ReadResponse(r interface{}) error {
+	_, buf, err := w.conn.ReadMessage()
+	if err != nil {
+		return err
 	}
-	r := Response{}
-	if err := w.conn.ReadJSON(&r); err != nil {
-		return nil, err
+	log.WithField("raw", true).Debugf("recv: %s", buf)
+	err = json.Unmarshal(buf, &r)
+	if err != nil {
+		return err
 	}
+	// if err := w.conn.ReadJSON(&r); err != nil {
+	// 	return nil, err
+	// }
 	log.Debugf("recv: %+v", r)
-	return &r, nil
+	return nil
 }
 
 func (w *websocketClient) Close() error {
